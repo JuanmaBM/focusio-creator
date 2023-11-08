@@ -1,0 +1,17 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: new-focus-app
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: name
+      description: FocusApp item name
+    - name: sourceCodeRepository
+      description: Source code git repository url
+    - name: configCodeRepository
+      description: GitOps repository url
+    - name: imageRegistry
+      description: Image registry url 
+  tasks:

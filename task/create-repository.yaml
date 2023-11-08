@@ -1,0 +1,16 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: create-repository
+spec:
+  params:
+    - name: repository-url
+      description: Repository URL
+    - name: repository-name
+      description: Repository name
+  workspaces:
+    - name: source
+  steps:
+    - name: create-repository
+      image: bash:latest
+      script: |

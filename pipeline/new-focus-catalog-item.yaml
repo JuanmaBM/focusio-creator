@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: new-focus-catalog-item
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: name
+      description: Catalog item name
+    - name: codeRepository
+      description: Source code git repository url
+    - name: artifactoryRegistry
+      description: Artifactory registry url where archetype will be stored
+  tasks:
