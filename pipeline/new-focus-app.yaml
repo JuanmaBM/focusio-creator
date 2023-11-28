@@ -3,8 +3,11 @@ kind: Pipeline
 metadata:
   name: new-focus-app
 spec:
-  workspaces:
-    - name: source
+  resources:
+    - name: workspace
+      type: git
+    - name: maven-repo
+      type: git
   params:
     - name: name
       description: FocusApp item name
@@ -12,6 +15,131 @@ spec:
       description: Source code git repository url
     - name: configCodeRepository
       description: GitOps repository url
-    - name: imageRegistry
-      description: Image registry url 
+    - name: groupId
+      description: groupId of new application
+    - name: artifactId
+      description: artifactId of new application
+    - name: package
+      description: package of new application
+    - name: archetypeRepositoryUrl
+    - name: archetypeGroupId
+    - name: archetypeArtifactId
+    - name: archetypeVersionId
   tasks:
+    - name: install-archetype
+      taskRef:
+        name: maven
+      resources:
+        inputs:
+          - name: source
+            resource: workspace
+        outputs:
+          - name: destination
+            resource: workspace
+      params:
+        - name: GOALS
+          value: install
+        - name: MAVEN_OPTS
+          value: -DarchetypeGroupId=${params.archetypeGroupId} -DarchetypeArtifactId=${params.archetypeArtifactId} -DarchetypeVersion=${params.archetypeVersion} 
+
+    - name: create-maven-project
+      taskRef:
+        name: maven
+      resources:
+        inputs:
+          - name: source
+            resource: workspace
+        outputs:
+          - name: destination
+            resource: workspace
+      params:
+        - name: GOALS
+          value: archetype:generate -DarchetypeGroupId=${params.archetypeGroupId} -DarchetypeArtifactId=${params.archetypeArtifactId} -DarchetypeVersion=${params.archetypeVersion} -DgroupId=${params.groupId} -DartifactId=${params.artifactId} -Dversion=0.1.0-SNAPSHOT -Dpackage=${params.package} -DinteractiveMode=false
+
+    - name: create-github-repo
+      taskRef:
+        name: curl
+      resources:
+        inputs:
+          - name: url
+            resource: maven-repo
+        outputs:
+          - name: destination
+            resource: workspace
+      params:
+        - name: revision
+          value: master
+        - name: deleteExisting
+          value: true
+      volumeMounts:
+        - name: github-tokens
+          mountPath: /tekton/secrets/github-tokens
+        - name: github-token-key
+          mountPath: /tekton/secrets/github-token-key
+
+    - name: upload-to-git
+      taskRef:
+        name: git-clone
+      resources:
+        inputs:
+          - name: url
+            resource: maven-repo
+        outputs:
+          - name: destination
+            resource: workspace
+      params:
+        - name: revision
+          value: master
+        - name: deleteExisting
+          value: true
+
+    - name: commit-and-push
+      taskRef:
+        name: git-push
+      resources:
+        inputs:
+          - name: url
+            resource: maven-repo
+          - name: destination
+            resource: workspace
+
+    # - name: api-request
+    #   taskRef:
+    #     name: curl
+    #   params:
+    #     - name: url
+    #       value: "YOUR_API_ENDPOINT"
+    #     - name: method
+    #       value: "POST"
+    #     - name: body
+    #       value: '{"key": "value"}'
+    #     - name: insecure
+    #       value: "true" # Set to "true" if your API endpoint uses a self-signed SSL certificate
+
+  finally:
+    - name: cleanup
+      taskRef:
+        name: maven
+      resources:
+        inputs:
+          - name: source
+            resource: workspace
+        outputs:
+          - name: destination
+            resource: workspace
+      params:
+        - name: GOALS
+          value: clean
+      volumeMounts:
+        - name: github-tokens
+          mountPath: /tekton/secrets/github-tokens
+        - name: github-token-key
+          mountPath: /tekton/secrets/github-token-key
+
+volumes:
+  - name: github-tokens
+    secret:
+      secretName: github-tokens-secret
+  - name: github-token-key
+    configMap:
+      name: github-token-key-configmap
